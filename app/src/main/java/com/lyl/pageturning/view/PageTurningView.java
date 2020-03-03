@@ -20,15 +20,17 @@ import java.util.Optional;
 
 public class PageTurningView extends View  {
     private static final String TAG = "lym123";
-    private Paint mAPaint, mBPaint, mCPaint;
-    private Path mAPath, mBPath, mCPath;
+    private Paint mAPaint, mBPaint, mCPaint, mTextPaint;
+    private Path mAPath, mBPath, mCPath, mPath;
     private float aX, aY, bX, bY, cX, cY, dX, dY, eX, eY, fX, fY,
             hX, hY, iX, iY, jX, jY, kX, kY;
     private float mViewH, mViewW;
     private float valid1X, valid1Y, valid2X, valid2Y;//有效值
-    private Canvas bitmapCanvas;
-    private Bitmap mBitmap;
+    private Canvas bitmapCanvas, mBitmapCanvasA, mBitmapCanvasB, mBitmapCanvasC;
+    private Bitmap mBitmap, mBitmapA, mBitmapB, mBitmapC;
+    private Matrix mMatrix;
     private boolean bRCornerStart = true;//是否从右下角开始翻页
+    private final boolean showContent = true; //显示文本内容
 
     public PageTurningView(Context context, AttributeSet attrs) {
         super(context, attrs);
@@ -58,6 +60,16 @@ public class PageTurningView extends View  {
         mAPath = new Path();
         mBPath = new Path();
         mCPath = new Path();
+        mPath = new Path();
+
+        mTextPaint = new Paint();
+        mTextPaint.setColor(Color.RED);
+        mTextPaint.setTextSize(35);
+        mTextPaint.setAntiAlias(true);
+        mTextPaint.setTextAlign(Paint.Align.CENTER);
+        mTextPaint.setSubpixelText(true);//设置自像素。如果该项为true，将有助于文本在LCD屏幕上的显示效果。
+
+        mMatrix = new Matrix();
 
         valid2X = valid1X = cX = 0;
         valid2Y = valid1Y = jY = 0;
@@ -76,6 +88,25 @@ public class PageTurningView extends View  {
             mBitmap = Bitmap.createBitmap((int)mViewW, (int)mViewH, Bitmap.Config.RGB_565);
             bitmapCanvas = new Canvas(mBitmap);
         }
+
+        if (null == mBitmapA) {
+            mBitmapA = Bitmap.createBitmap((int) mViewW, (int) mViewH, Bitmap.Config.RGB_565);
+            mBitmapCanvasA = new Canvas(mBitmapA);
+            mBitmapCanvasA.drawPath(getPathDefault(), mAPaint);
+            mBitmapCanvasA.drawText("this is screen A...right!", mViewW - 200, mViewH - 100, mTextPaint);
+        }
+        if (null == mBitmapB) {
+            mBitmapB = Bitmap.createBitmap((int) mViewW, (int) mViewH, Bitmap.Config.RGB_565);
+            mBitmapCanvasB = new Canvas(mBitmapB);
+            mBitmapCanvasB.drawPath(getPathDefault(), mBPaint);
+            mBitmapCanvasB.drawText("this is screen B...right!", mViewW - 200, mViewH - 100, mTextPaint);
+        }
+        if (null == mBitmapC) {
+            mBitmapC = Bitmap.createBitmap((int)mViewW, (int)mViewH, Bitmap.Config.RGB_565);
+            mBitmapCanvasC = new Canvas(mBitmapC);
+            mBitmapCanvasC.drawPath(getPathDefault(), mCPaint);
+            mBitmapCanvasC.drawText("this is screen A...right!", mViewW-200, mViewH-100, mTextPaint);
+        }
     }
 
     @Override
@@ -85,14 +116,41 @@ public class PageTurningView extends View  {
         getAPath();
         getBPath();
         getCPath();
-        //显示顺序B-C-A，C在B上，使用SRC_OVER模式，此时C会把B的贝塞尔曲线部分覆盖，再画A，A把C多出来的部分覆盖。
-        //AB分割是akij,abdc这个两条贝塞尔曲线，C是abdika这个闭合的直线组成
-        bitmapCanvas.drawPath(mBPath, mBPaint);
-        bitmapCanvas.drawPath(mCPath, mCPaint);
-        bitmapCanvas.drawPath(mAPath, mAPaint);
-        canvas.drawBitmap(mBitmap,0,0,null);
-        Log.d(TAG, "onDraw: " + (System.currentTimeMillis() - l));
-        Log.d(TAG, "onDraw: " + canvas.isHardwareAccelerated());
+
+        if (showContent) {
+            setCMatrix();
+
+            // C : 此处经过矩阵变换，C得到的是一个三角形，无法填满原本C的区域
+            // 要先画出C的背景色，再画C的path
+            canvas.drawColor(Color.YELLOW);
+
+            canvas.save();
+            canvas.clipPath(mCPath);
+            canvas.drawBitmap(mBitmapC, mMatrix, null);
+            canvas.restore();
+
+            // A
+            canvas.save();
+            canvas.clipPath(mAPath);
+            canvas.drawBitmap(mBitmapA, 0, 0, null);
+            canvas.restore();
+
+            // B
+            canvas.save();
+            canvas.clipPath(mCPath);
+            canvas.clipPath(mBPath, Region.Op.REVERSE_DIFFERENCE);//裁剪出pathB不同于pathC区域的部分
+            canvas.drawBitmap(mBitmapB, 0, 0, null);
+            canvas.restore();
+        } else {
+            //显示顺序B-C-A，C在B上，使用SRC_OVER模式，此时C会把B的贝塞尔曲线部分覆盖，再画A，A把C多出来的部分覆盖。
+            //AB分割是akij,abdc这个两条贝塞尔曲线，C是abdika这个闭合的直线组成
+            bitmapCanvas.drawPath(mBPath, mBPaint);
+            bitmapCanvas.drawPath(mCPath, mCPaint);
+            bitmapCanvas.drawPath(mAPath, mAPaint);
+            canvas.drawBitmap(mBitmap,0,0,null);
+            Log.d(TAG, "onDraw: " + (System.currentTimeMillis() - l));
+            Log.d(TAG, "onDraw: " + canvas.isHardwareAccelerated());
+        }
     }
 
     @Override
@@ -225,7 +283,7 @@ public class PageTurningView extends View  {
         mBPath.close();
     }
 
-    private void  getCPath(){
+    private void getCPath(){
         mCPath.reset();
         mCPath.moveTo(aX, aY);
         mCPath.lineTo(bX, bY);
@@ -233,5 +291,31 @@ public class PageTurningView extends View  {
         mCPath.lineTo(iX, iY);
         mCPath.lineTo(kX, kY);
         mCPath.close();
+    }
+
+    private Path getPathDefault(){ //绘制默认的界面
+        mPath.reset();
+        mPath.lineTo(0, mViewH);
+        mPath.lineTo(mViewW, mViewH);
+        mPath.lineTo(mViewW, 0);
+        mPath.close();
+        return mPath;
+    }
+
+    private void setCMatrix(){//从A 变换 到C
+        float eh = (float) Math.hypot(fX-eX, hY-fY);
+        float sin0 = (fX-eX) / eh;
+        float cos0 = (hY-fY) / eh;
+        //设置翻转和旋转矩阵
+        float[] mMatrixArray = { 0, 0, 0, 0, 0, 0, 0, 0, 1.0f };
+        mMatrixArray[0] = -(1-2f * sin0 * sin0);
+        mMatrixArray[1] = 2f * sin0 * cos0;
+        mMatrixArray[3] = 2f * sin0 * cos0;
+        mMatrixArray[4] = 1 - 2f * sin0 * sin0;
+
+        mMatrix.reset();
+        mMatrix.setValues(mMatrixArray);//翻转和旋转
+        mMatrix.preTranslate(-eX, -eY);//沿当前XY轴负方向位移得到 矩形A₃B₃C₃D₃
+        mMatrix.postTranslate(eX, eY);//沿原XY轴方向位移得到 矩形A4 B4 C4 D4
     }
 }

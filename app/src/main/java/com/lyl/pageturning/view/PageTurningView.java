@@ -119,7 +119,7 @@ public class PageTurningView extends View  {
     }
 
     private void getEveryPoint(){
-
+        //处理边界问题
         float tempY = 3f*(fY-aY)/4f;
         float tempX = 3f*(fX-aX)/4f;
         cX = 0 == tempX ? fX : fX - (tempY*tempY/tempX+tempX);

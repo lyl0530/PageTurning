@@ -2,6 +2,7 @@ package com.lyl.pageturning.view;
 
 import android.content.Context;
 import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
 import android.graphics.Canvas;
 import android.graphics.Color;
 import android.graphics.Matrix;
@@ -10,10 +11,16 @@ import android.graphics.Path;
 import android.graphics.PorterDuff;
 import android.graphics.PorterDuffXfermode;
 import android.graphics.Region;
+import android.text.Layout;
+import android.text.StaticLayout;
+import android.text.TextPaint;
 import android.util.AttributeSet;
 import android.util.Log;
 import android.view.MotionEvent;
 import android.view.View;
+
+import com.lyl.pageturning.R;
+import com.lyl.pageturning.util.SDCardUtils;
 
 import java.util.Optional;
 
@@ -31,7 +38,15 @@ public class PageTurningView extends View  {
     private Matrix mMatrix;
     private boolean bRCornerStart = true;//是否从右下角开始翻页
     private final boolean showContent = true; //显示文本内容
+    private StaticLayout layout;
 
+    private TextPaint textPaint;
+
+
+    private final int A_BG_COLOR = Color.GREEN;
+    private final int B_BG_COLOR = Color.WHITE;
+    private final int C_BG_COLOR = Color.YELLOW;
+    private final int TEXT_COLOR = Color.BLACK;
     public PageTurningView(Context context, AttributeSet attrs) {
         super(context, attrs);
         init();
@@ -44,18 +59,20 @@ public class PageTurningView extends View  {
 
     private void init(){
         mAPaint = new Paint();
-        mAPaint.setColor(Color.GREEN);
+        mAPaint.setColor(A_BG_COLOR);
         mAPaint.setAntiAlias(true);
         //mAPaint.setXfermode(new PorterDuffXfermode(PorterDuff.Mode.SRC_OVER));
 
         mBPaint = new Paint();
-        mBPaint.setColor(Color.WHITE);
+        mBPaint.setColor(B_BG_COLOR);
         mBPaint.setAntiAlias(true);
 
+
         mCPaint = new Paint();
-        mCPaint.setColor(Color.YELLOW);
+        mCPaint.setColor(C_BG_COLOR);
         //mCPaint.setXfermode(new PorterDuffXfermode(PorterDuff.Mode.SRC_OVER));//SRC_OVER/SRC_ATOP/DST_OVER
         mCPaint.setAntiAlias(true);
+        mBPaint.setStrokeWidth(10);
 
         mAPath = new Path();
         mBPath = new Path();
@@ -63,7 +80,7 @@ public class PageTurningView extends View  {
         mPath = new Path();
 
         mTextPaint = new Paint();
-        mTextPaint.setColor(Color.RED);
+        mTextPaint.setColor(TEXT_COLOR);
         mTextPaint.setTextSize(35);
         mTextPaint.setAntiAlias(true);
         mTextPaint.setTextAlign(Paint.Align.CENTER);
@@ -74,6 +91,8 @@ public class PageTurningView extends View  {
         valid2X = valid1X = cX = 0;
         valid2Y = valid1Y = jY = 0;
         //setLayerType(View.LAYER_TYPE_SOFTWARE, null);
+
+        //final float v = mAPaint.measureText(string);
     }
 
     @Override
@@ -88,27 +107,55 @@ public class PageTurningView extends View  {
             mBitmap = Bitmap.createBitmap((int)mViewW, (int)mViewH, Bitmap.Config.RGB_565);
             bitmapCanvas = new Canvas(mBitmap);
         }
-
+//        String sb = SDCardUtils.handleStr(string, mAPaint, mViewW).toString();
+//        Log.d(TAG, "string: " + string + ", \n sb = " + sb);
+//        String sb = string.replace("\n", "\\n");//读取sd卡数据后，换行
+        textPaint = new TextPaint();
+        textPaint.setColor(TEXT_COLOR);/*setARGB(0xFF, 0, 0, 0);*/
+        textPaint.setTextSize(30);
+        textPaint.setAntiAlias(true);
+        layout = new StaticLayout(string, textPaint, (int)mViewW,
+                Layout.Alignment.ALIGN_NORMAL, 1.0F, 0.0F, true);
+        createCanvas(100, 25);
+    }
+    private void createCanvas(float x, float y){
         if (null == mBitmapA) {
+            //mBitmapA = BitmapFactory.decodeResource(getResources(), R.drawable.bg).copy(Bitmap.Config.RGB_565, true);
+            //mBitmapA = Bitmap.createScaledBitmap(mBitmapA, (int) mViewW, (int) mViewH, true);
             mBitmapA = Bitmap.createBitmap((int) mViewW, (int) mViewH, Bitmap.Config.RGB_565);
             mBitmapCanvasA = new Canvas(mBitmapA);
             mBitmapCanvasA.drawPath(getPathDefault(), mAPaint);
-            mBitmapCanvasA.drawText("this is screen A...right!", mViewW - 200, mViewH - 100, mTextPaint);
+
+            //mBitmapCanvasA.drawText(strA, x, y, mTextPaint)
+            mBitmapCanvasA.save();
+            mBitmapCanvasA.translate(x, y);//从x,y开始画
+            layout.draw(mBitmapCanvasA);
+            mBitmapCanvasA.restore();//别忘了restore
+
+            //mBitmapCanvasA.drawText(strA, w, h, mTextPaint);
         }
         if (null == mBitmapB) {
             mBitmapB = Bitmap.createBitmap((int) mViewW, (int) mViewH, Bitmap.Config.RGB_565);
             mBitmapCanvasB = new Canvas(mBitmapB);
             mBitmapCanvasB.drawPath(getPathDefault(), mBPaint);
-            mBitmapCanvasB.drawText("this is screen B...right!", mViewW - 200, mViewH - 100, mTextPaint);
+
+            //mBitmapCanvasB.drawText(strB, x, y, mTextPaint);
+            mBitmapCanvasB.save();
+            mBitmapCanvasB.translate(x, y);
+            layout.draw(mBitmapCanvasB);
+            mBitmapCanvasB.restore();
         }
         if (null == mBitmapC) {
             mBitmapC = Bitmap.createBitmap((int)mViewW, (int)mViewH, Bitmap.Config.RGB_565);
             mBitmapCanvasC = new Canvas(mBitmapC);
             mBitmapCanvasC.drawPath(getPathDefault(), mCPaint);
-            mBitmapCanvasC.drawText("this is screen A...right!", mViewW-200, mViewH-100, mTextPaint);
+
+            mBitmapCanvasC.save();
+            mBitmapCanvasC.translate(x, y);
+            layout.draw(mBitmapCanvasC);
+            mBitmapCanvasC.restore();
         }
     }
-
     @Override
     protected void onDraw(Canvas canvas) {
         long l = System.currentTimeMillis();
@@ -122,7 +169,7 @@ public class PageTurningView extends View  {
 
             // C : 此处经过矩阵变换，C得到的是一个三角形，无法填满原本C的区域
             // 要先画出C的背景色，再画C的path
-            canvas.drawColor(Color.YELLOW);
+            canvas.drawColor(C_BG_COLOR);
 
             canvas.save();
             canvas.clipPath(mCPath);
@@ -317,5 +364,17 @@ public class PageTurningView extends View  {
         mMatrix.setValues(mMatrixArray);//翻转和旋转
         mMatrix.preTranslate(-eX, -eY);//沿当前XY轴负方向位移得到 矩形A₃B₃C₃D₃
         mMatrix.postTranslate(eX, eY);//沿原XY轴方向位移得到 矩形A4 B4 C4 D4
+    }
+
+    private String string;
+    public void updateContent(String str){
+        string = str;
+//        aX = fX = mViewW = getWidth();
+//        aY = fY = mViewH = getHeight();
+//        createCanvas(str, "bbbbbbb", 0, 0);
+////        mBitmapCanvasA.drawText(str, 0, 0, mTextPaint);
+////        mBitmapCanvasB.drawText("this is screen B...right!", mViewW - 200, mViewH - 100, mTextPaint);
+////        mBitmapCanvasC.drawText(str, 0, 0, mTextPaint);
+//        invalidate();
     }
 }
